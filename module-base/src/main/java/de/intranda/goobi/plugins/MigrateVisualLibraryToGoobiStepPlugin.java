@@ -115,6 +115,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
 
     private Map<String, Element> dmdSecMap = new HashMap<>();
     private Element defaultFileGroup = null;
+    private Element altoFileGroup = null;
     private Element logicalStructMap = null;
     private Element physicalStructMap = null;
     private Element structLink = null;
@@ -258,7 +259,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
             // get identifier
             String identifier = getIdentifier(logical);
             String anchorIdentifier = getIdentifier(anchor);
-            
+
             // cleanup metadata
             cleanupMetadata(logical);
             if (anchor != null) {
@@ -331,9 +332,11 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
             return false;
         }
 
+        // download alto files
+        downloadFulltexts();
+
         //  download images
         return downloadImages();
-
     }
 
     /**
@@ -360,6 +363,11 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
 
     }
 
+    /**
+     * cleanup existing metadata
+     *
+     * @param logical
+     */
     private void cleanupMetadata(DocStruct logical) {
         List<Metadata> existingMetadata = new ArrayList<>(logical.getAllMetadata());
         for (Metadata md : existingMetadata) {
@@ -373,64 +381,6 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                 logical.removePerson(p);
             }
         }
-    }
-
-    /**
-     * download all images into the media folder
-     *
-     * @return
-     */
-    private boolean downloadImages() {
-        if (defaultFileGroup == null) {
-            // no file group found, abort
-            return true;
-        }
-
-        try {
-            Path folder = Paths.get(process.getImagesTifDirectory(false));
-            if (!Files.exists(folder)) {
-                Files.createDirectories(folder);
-            }
-
-            if (testResponse != null) {
-                // in case of a JUnit Test
-                for (ImageName imageFile : imageFiles) {
-                    Path path = Paths.get(folder.toString(), imageFile.getName());
-                    Files.createFile(path);
-                }
-            } else {
-                // in case of real live usage
-                for (ImageName imageFile : imageFiles) {
-                    String url = imageFile.getUrl();
-
-                    String filename = imageFile.getName();
-                    Path file = Paths.get(folder.toString(), filename);
-                    try {
-                        OutputStream out = Files.newOutputStream(file);
-                        HttpUtils.getStreamFromUrl(out, url);
-                        out.close();
-                    } catch (Exception e) {
-                        log.error("Error during image download from {}, retry in 5 sec", url);
-                        Thread.sleep(5000l);
-                        OutputStream out = Files.newOutputStream(Paths.get(folder.toString(), filename));
-                        HttpUtils.getStreamFromUrl(out, url);
-                        out.close();
-                    }
-                    // delete 0 byte files
-                    if (Files.isRegularFile(file) && Files.size(file) == 0) {
-                        Files.delete(file);
-                        Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Image download failed.",
-                                "Visual Library Migration Plugin");
-                        return false;
-                    }
-
-                }
-            }
-        } catch (IOException | InterruptedException | SwapException e) {
-            log.error(e);
-            return false;
-        }
-        return true;
     }
 
     /**
@@ -453,6 +403,13 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                 // do we need anything from mets:amdSec?
             } else if ("fileSec".equals(metsElement.getName())) {
                 for (Element fileGroup : metsElement.getChildren()) {
+
+                    // get the fulltext filegroup
+                    if ("FULLTEXT".equals(fileGroup.getAttributeValue("USE"))) {
+                        altoFileGroup = fileGroup;
+                    }
+
+                    // get the images filegroup
                     if ("DEFAULT".equals(fileGroup.getAttributeValue("USE"))) {
                         defaultFileGroup = fileGroup;
                         for (Element file : defaultFileGroup.getChildren()) {
@@ -972,23 +929,23 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
         return null;
     }
 
-        /**
-         * get CatalogIDDigital from given docstruct element
-         *
-         * @param docStruct
-         * @return
-         */
-        private String getIdentifier(DocStruct docStruct) {
-            String id = null;
-            if (docStruct != null && docStruct.getAllMetadata() != null) {
-                for (Metadata md : docStruct.getAllMetadata()) {
-                    if ("CatalogIDDigital".equals(md.getType().getName())) {
-                        id = md.getValue();
-                    }
+    /**
+     * get CatalogIDDigital from given docstruct element
+     *
+     * @param docStruct
+     * @return
+     */
+    private String getIdentifier(DocStruct docStruct) {
+        String id = null;
+        if (docStruct != null && docStruct.getAllMetadata() != null) {
+            for (Metadata md : docStruct.getAllMetadata()) {
+                if ("CatalogIDDigital".equals(md.getType().getName())) {
+                    id = md.getValue();
                 }
             }
-            return id;
         }
+        return id;
+    }
 
     /**
      * get process property
@@ -1004,6 +961,113 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
             }
         }
         return null;
+    }
+
+    /**
+     * download all images into the media folder
+     *
+     * @return
+     */
+    private boolean downloadImages() {
+        if (defaultFileGroup == null) {
+            // no file group found, abort
+            return true;
+        }
+
+        try {
+            Path folder = Paths.get(process.getImagesTifDirectory(false));
+            if (!Files.exists(folder)) {
+                Files.createDirectories(folder);
+            }
+
+            if (testResponse != null) {
+                // in case of a JUnit Test
+                for (ImageName imageFile : imageFiles) {
+                    Path path = Paths.get(folder.toString(), imageFile.getName());
+                    Files.createFile(path);
+                }
+            } else {
+                // in case of real live usage
+                for (ImageName imageFile : imageFiles) {
+                    String url = imageFile.getUrl();
+
+                    String filename = imageFile.getName();
+                    Path file = Paths.get(folder.toString(), filename);
+                    try {
+                        OutputStream out = Files.newOutputStream(file);
+                        HttpUtils.getStreamFromUrl(out, url);
+                        out.close();
+                    } catch (Exception e) {
+                        log.error("Error during image download from {}, retry in 5 sec", url);
+                        Thread.sleep(5000l);
+                        OutputStream out = Files.newOutputStream(Paths.get(folder.toString(), filename));
+                        HttpUtils.getStreamFromUrl(out, url);
+                        out.close();
+                    }
+                    // delete 0 byte files
+                    if (Files.isRegularFile(file) && Files.size(file) == 0) {
+                        Files.delete(file);
+                        Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Image download failed.",
+                                "Visual Library Migration Plugin");
+                        return false;
+                    }
+
+                }
+            }
+        } catch (IOException | InterruptedException | SwapException e) {
+            log.error("Error while downloading the image files", e);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * download all fulltext files into alto folder
+     *
+     * @return
+     */
+    private void downloadFulltexts() {
+        if (altoFileGroup == null) {
+            return;
+        }
+
+        // execute only if fulltexts exist
+        try {
+            Path folder = Paths.get(process.getOcrAltoDirectory());
+            if (!Files.exists(folder)) {
+                Files.createDirectories(folder);
+            }
+
+            for (Element ele : altoFileGroup.getChildren()) {
+                Element flocat = ele.getChild("FLocat", mets);
+                String id = ele.getAttributeValue("ID");
+                String url = flocat.getAttributeValue("href", xlink);
+                String filename = id.replace("ALTO", "IMG_DEFAULT_") + ".xml";
+
+                Path file = Paths.get(folder.toString(), filename);
+                try {
+                    OutputStream out = Files.newOutputStream(file);
+                    HttpUtils.getStreamFromUrl(out, url);
+                    out.close();
+                } catch (Exception e) {
+                    log.error("Error during image download from {}, retry in 5 sec", url);
+                    Thread.sleep(5000l);
+                    OutputStream out = Files.newOutputStream(Paths.get(folder.toString(), filename));
+                    HttpUtils.getStreamFromUrl(out, url);
+                    out.close();
+                }
+                // delete 0 byte files
+                if (Files.isRegularFile(file) && Files.size(file) == 0) {
+                    Files.delete(file);
+                    Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Fulltext download failed.",
+                            "Visual Library Migration Plugin");
+
+                }
+            }
+
+        } catch (IOException | InterruptedException | SwapException e) {
+            log.error("Error while downloading the fulltext files", e);
+        }
     }
 
     @Override
