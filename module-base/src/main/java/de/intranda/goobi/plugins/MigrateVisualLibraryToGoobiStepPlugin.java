@@ -52,7 +52,9 @@ import de.sub.goobi.config.ConfigurationHelper;
 import de.sub.goobi.helper.BeanHelper;
 import de.sub.goobi.helper.Helper;
 import de.sub.goobi.helper.XmlTools;
+import de.sub.goobi.helper.exceptions.DAOException;
 import de.sub.goobi.helper.exceptions.SwapException;
+import de.sub.goobi.persistence.managers.ProcessManager;
 import de.sub.goobi.persistence.managers.PropertyManager;
 import io.goobi.workflow.api.connection.HttpUtils;
 import lombok.AllArgsConstructor;
@@ -161,8 +163,6 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
     private MetadataType catalogIDMainSeriesType;
 
     private String downloadUrl;
-    private String identifier;
-    private String anchorIdentifier;
 
     private Map<String, String> docStructRulesetNames = new HashMap<>();
     private DocStruct logical;
@@ -222,8 +222,6 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
         if (testResponse == null) {
             SubnodeConfiguration config = ConfigPlugins.getProjectAndStepConfig(title, step);
             downloadUrl = getProcessProperty(step.getProzess(), config.getString("/vl-url"));
-            identifier = getProcessProperty(step.getProzess(), config.getString("/vl-identifier"));
-            anchorIdentifier = getProcessProperty(step.getProzess(), config.getString("/vl-identifier-volume"));
         }
 
         Path rulesetPath = Paths.get(ConfigurationHelper.getInstance().getRulesetFolder(), process.getRegelsatz().getDatei());
@@ -257,6 +255,10 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
             }
             DocStruct physical = digitalDocument.getPhysicalDocStruct();
 
+            // get identifier
+            String identifier = getIdentifier(logical);
+            String anchorIdentifier = getIdentifier(anchor);
+            
             // cleanup metadata
             cleanupMetadata(logical);
             if (anchor != null) {
@@ -320,8 +322,9 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
             // save
             process.writeMetadataFile(fileformat);
             beanHelper.EigenschaftHinzufuegen(process, "VL Final URL", downloadUrl + identifier);
+            ProcessManager.saveProcess(process);
 
-        } catch (ReadException | PreferencesException | WriteException | IOException | SwapException e) {
+        } catch (ReadException | PreferencesException | WriteException | IOException | SwapException | DAOException e) {
             // write error message to processlog
             Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error during  import " + e.getMessage(),
                     "Visual Library Migration Plugin");
@@ -969,23 +972,23 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
         return null;
     }
 
-    //    /**
-    //     * get CatalogIDDigital from given docstruct element
-    //     *
-    //     * @param docStruct
-    //     * @return
-    //     */
-    //    private String getIdentifier(DocStruct docStruct) {
-    //        String id = null;
-    //        if (docStruct != null && docStruct.getAllMetadata() != null) {
-    //            for (Metadata md : docStruct.getAllMetadata()) {
-    //                if ("CatalogIDDigital".equals(md.getType().getName())) {
-    //                    id = md.getValue();
-    //                }
-    //            }
-    //        }
-    //        return id;
-    //    }
+        /**
+         * get CatalogIDDigital from given docstruct element
+         *
+         * @param docStruct
+         * @return
+         */
+        private String getIdentifier(DocStruct docStruct) {
+            String id = null;
+            if (docStruct != null && docStruct.getAllMetadata() != null) {
+                for (Metadata md : docStruct.getAllMetadata()) {
+                    if ("CatalogIDDigital".equals(md.getType().getName())) {
+                        id = md.getValue();
+                    }
+                }
+            }
+            return id;
+        }
 
     /**
      * get process property
