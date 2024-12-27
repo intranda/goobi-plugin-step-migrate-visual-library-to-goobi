@@ -12,8 +12,12 @@
         <project>*</project>
         <step>*</step>
 
-        <downloadUrl>https://visuallibrary.net/ihd4/oai/?verb=GetRecord&amp;metadataPrefix=mets&amp;identifier=</downloadUrl>        
+		<!-- define the properties where the identifiers shall be taken from -->
+		<vl-identifier>VL Identifier</vl-identifier>
+		<vl-identifier-volume>VL Identifier (volume)</vl-identifier-volume>
 
+		<!-- define the property where the VL server url shall be taken from -->
+        <vl-url>VL URL</vl-url>        
     </config>
 
 </config_plugin>

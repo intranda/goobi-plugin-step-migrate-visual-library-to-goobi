@@ -35,6 +35,7 @@ import org.apache.commons.configuration.SubnodeConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.goobi.beans.Process;
+import org.goobi.beans.Processproperty;
 import org.goobi.beans.Step;
 import org.goobi.production.enums.LogType;
 import org.goobi.production.enums.PluginGuiType;
@@ -52,6 +53,7 @@ import de.sub.goobi.helper.BeanHelper;
 import de.sub.goobi.helper.Helper;
 import de.sub.goobi.helper.XmlTools;
 import de.sub.goobi.helper.exceptions.SwapException;
+import de.sub.goobi.persistence.managers.PropertyManager;
 import io.goobi.workflow.api.connection.HttpUtils;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -159,6 +161,8 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
     private MetadataType catalogIDMainSeriesType;
 
     private String downloadUrl;
+    private String identifier;
+    private String anchorIdentifier;
 
     private Map<String, String> docStructRulesetNames = new HashMap<>();
     private DocStruct logical;
@@ -214,10 +218,12 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
         seriesOrderType = prefs.getMetadataTypeByName("SeriesOrder");
         catalogIDMainSeriesType = prefs.getMetadataTypeByName("CatalogIDMainSeries");
 
-        // just in case of a JUnit test
+        // just in case it is not a JUnit test
         if (testResponse == null) {
             SubnodeConfiguration config = ConfigPlugins.getProjectAndStepConfig(title, step);
-            downloadUrl = config.getString("/downloadUrl");
+            downloadUrl = getProcessProperty(step.getProzess(), config.getString("/vl-url"));
+            identifier = getProcessProperty(step.getProzess(), config.getString("/vl-identifier"));
+            anchorIdentifier = getProcessProperty(step.getProzess(), config.getString("/vl-identifier-volume"));
         }
 
         Path rulesetPath = Paths.get(ConfigurationHelper.getInstance().getRulesetFolder(), process.getRegelsatz().getDatei());
@@ -250,10 +256,6 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                 logical = logical.getAllChildren().get(0);
             }
             DocStruct physical = digitalDocument.getPhysicalDocStruct();
-
-            // get identifier
-            String identifier = getIdentifier(logical);
-            String anchorIdentifier = getIdentifier(anchor);
 
             // cleanup metadata
             cleanupMetadata(logical);
@@ -317,8 +319,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
 
             // save
             process.writeMetadataFile(fileformat);
-            beanHelper.EigenschaftHinzufuegen(process, "VL-ID", identifier);
-            beanHelper.EigenschaftHinzufuegen(process, "VL-URL", downloadUrl + identifier);
+            beanHelper.EigenschaftHinzufuegen(process, "VL Final URL", downloadUrl + identifier);
 
         } catch (ReadException | PreferencesException | WriteException | IOException | SwapException e) {
             // write error message to processlog
@@ -968,22 +969,38 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
         return null;
     }
 
+    //    /**
+    //     * get CatalogIDDigital from given docstruct element
+    //     *
+    //     * @param docStruct
+    //     * @return
+    //     */
+    //    private String getIdentifier(DocStruct docStruct) {
+    //        String id = null;
+    //        if (docStruct != null && docStruct.getAllMetadata() != null) {
+    //            for (Metadata md : docStruct.getAllMetadata()) {
+    //                if ("CatalogIDDigital".equals(md.getType().getName())) {
+    //                    id = md.getValue();
+    //                }
+    //            }
+    //        }
+    //        return id;
+    //    }
+
     /**
-     * get CatalogIDDigital from given docstruct element
-     *
-     * @param docStruct
+     * get process property
+     * 
+     * @param step
      * @return
      */
-    private String getIdentifier(DocStruct docStruct) {
-        String id = null;
-        if (docStruct != null && docStruct.getAllMetadata() != null) {
-            for (Metadata md : docStruct.getAllMetadata()) {
-                if ("CatalogIDDigital".equals(md.getType().getName())) {
-                    id = md.getValue();
-                }
+    private String getProcessProperty(Process process, String propertyName) {
+        List<Processproperty> props = PropertyManager.getProcessPropertiesForProcess(process.getId());
+        for (Processproperty p : props) {
+            if (propertyName.equals(p.getTitel())) {
+                return p.getWert();
             }
         }
-        return id;
+        return null;
     }
 
     @Override
