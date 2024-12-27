@@ -114,7 +114,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
     private static final Namespace oaiNamespace = Namespace.getNamespace("oai", "http://www.openarchives.org/OAI/2.0/");
 
     private Map<String, Element> dmdSecMap = new HashMap<>();
-    private Element defaultFileGroup = null;
+    private Element imageFileGroup = null;
     private Element altoFileGroup = null;
     private Element logicalStructMap = null;
     private Element physicalStructMap = null;
@@ -332,11 +332,13 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
             return false;
         }
 
+        //  download images
+        boolean result = downloadImages();
+
         // download alto files
         downloadFulltexts();
 
-        //  download images
-        return downloadImages();
+        return result;
     }
 
     /**
@@ -410,9 +412,9 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                     }
 
                     // get the images filegroup
-                    if ("DEFAULT".equals(fileGroup.getAttributeValue("USE"))) {
-                        defaultFileGroup = fileGroup;
-                        for (Element file : defaultFileGroup.getChildren()) {
+                    if ("MAX".equals(fileGroup.getAttributeValue("USE"))) {
+                        imageFileGroup = fileGroup;
+                        for (Element file : imageFileGroup.getChildren()) {
                             Element flocat = file.getChild("FLocat", mets);
 
                             String mimeType = file.getAttributeValue("MIMETYPE");
@@ -969,7 +971,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
      * @return
      */
     private boolean downloadImages() {
-        if (defaultFileGroup == null) {
+        if (imageFileGroup == null) {
             // no file group found, abort
             return true;
         }
@@ -1042,7 +1044,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                 Element flocat = ele.getChild("FLocat", mets);
                 String id = ele.getAttributeValue("ID");
                 String url = flocat.getAttributeValue("href", xlink);
-                String filename = id.replace("ALTO", "IMG_DEFAULT_") + ".xml";
+                String filename = id.replace("ALTO", "IMG_MAX_") + ".xml";
 
                 Path file = Paths.get(folder.toString(), filename);
                 try {
