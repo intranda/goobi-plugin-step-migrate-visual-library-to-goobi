@@ -660,8 +660,10 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                         for (Element namePart : namePartList) {
                             if ("family".equals(namePart.getAttributeValue("type"))) {
                                 lastName = namePart.getText();
-                            } else {
+                            } else if ("given".equals(namePart.getAttributeValue("type"))) {
                                 firstName = namePart.getText();
+                            } else if (StringUtils.isEmpty(lastName)) {
+                                lastName = namePart.getText();
                             }
                         }
                     }
