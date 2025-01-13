@@ -14,6 +14,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import de.sub.goobi.helper.BeanHelper;
+import de.sub.goobi.helper.Helper;
+import org.apache.commons.math3.analysis.function.Pow;
 import org.easymock.EasyMock;
 import org.goobi.beans.Process;
 import org.goobi.beans.Project;
@@ -48,7 +51,7 @@ import ugh.dl.Prefs;
 import ugh.fileformats.mets.MetsMods;
 
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({ MetadatenHelper.class, VariableReplacer.class, ConfigurationHelper.class, ProcessManager.class,
+@PrepareForTest({ MetadatenHelper.class, VariableReplacer.class, ConfigurationHelper.class, Helper.class, ProcessManager.class,
         MetadataManager.class })
 @PowerMockIgnore({ "javax.management.*", "javax.net.ssl.*", "jdk.internal.reflect.*" })
 
@@ -61,6 +64,7 @@ public class MigrateVisualLibraryToGoobiPluginTest {
     private Process process;
     private Prefs prefs;
     private static String resourcesFolder;
+    private BeanHelper beanHelper;
 
     @BeforeClass
     public static void setUpClass() {
@@ -95,6 +99,7 @@ public class MigrateVisualLibraryToGoobiPluginTest {
         PowerMock.mockStatic(ConfigurationHelper.class);
         ConfigurationHelper configurationHelper = EasyMock.createMock(ConfigurationHelper.class);
         EasyMock.expect(ConfigurationHelper.getInstance()).andReturn(configurationHelper).anyTimes();
+        EasyMock.expect(configurationHelper.getMaxDatabaseConnectionRetries()).andReturn(3).anyTimes();
         EasyMock.expect(configurationHelper.getMetsEditorLockingTime()).andReturn(1800000l).anyTimes();
         EasyMock.expect(configurationHelper.isAllowWhitespacesInFolder()).andReturn(false).anyTimes();
         EasyMock.expect(configurationHelper.useS3()).andReturn(false).anyTimes();
@@ -103,10 +108,26 @@ public class MigrateVisualLibraryToGoobiPluginTest {
         EasyMock.expect(configurationHelper.getMetadataFolder()).andReturn(metadataDirectoryName).anyTimes();
         EasyMock.expect(configurationHelper.getRulesetFolder()).andReturn(resourcesFolder).anyTimes();
         EasyMock.expect(configurationHelper.getProcessImagesMainDirectoryName()).andReturn("00469418X_media").anyTimes();
+        EasyMock.expect(configurationHelper.getProcessOcrAltoDirectoryName()).andReturn("00469418X_alto").anyTimes();
         EasyMock.expect(configurationHelper.isUseMasterDirectory()).andReturn(true).anyTimes();
 
         EasyMock.expect(configurationHelper.getNumberOfMetaBackups()).andReturn(0).anyTimes();
         EasyMock.replay(configurationHelper);
+
+        beanHelper = EasyMock.createMock(BeanHelper.class);
+        beanHelper.EigenschaftHinzufuegen((Process) EasyMock.anyObject(), EasyMock.anyString(), EasyMock.anyString());
+        EasyMock.expectLastCall().anyTimes();
+        EasyMock.replay(beanHelper);
+
+        PowerMock.mockStatic(Helper.class);
+        Helper.addMessageToProcessJournal(EasyMock.anyInt(), EasyMock.anyObject(), EasyMock.anyString(), EasyMock.anyString());
+        PowerMock.expectLastCall().anyTimes();
+        PowerMock.replayAll(Helper.class);
+
+        PowerMock.mockStatic(ProcessManager.class);
+        ProcessManager.saveProcess(EasyMock.anyObject());
+        PowerMock.expectLastCall();
+        PowerMock.replayAll(ProcessManager.class);
 
         PowerMock.mockStatic(VariableReplacer.class);
         EasyMock.expect(VariableReplacer.simpleReplace(EasyMock.anyString(), EasyMock.anyObject())).andReturn("00469418X_media").anyTimes();
@@ -132,14 +153,13 @@ public class MigrateVisualLibraryToGoobiPluginTest {
 
         process = getProcess();
 
-        Ruleset ruleset = PowerMock.createMock(Ruleset.class);
-        ruleset.setTitel("ruleset");
-        ruleset.setDatei("ruleset.xml");
+        Ruleset ruleset = EasyMock.createMock(Ruleset.class);
+        EasyMock.expect(ruleset.getId()).andReturn(0).anyTimes();
         EasyMock.expect(ruleset.getDatei()).andReturn("ruleset.xml").anyTimes();
-        process.setRegelsatz(ruleset);
         EasyMock.expect(ruleset.getPreferences()).andReturn(prefs).anyTimes();
-        PowerMock.replay(ruleset);
+        EasyMock.replay(ruleset);
 
+        process.setRegelsatz(ruleset);
     }
 
     @Test
@@ -209,6 +229,9 @@ public class MigrateVisualLibraryToGoobiPluginTest {
         plugin.setTestResponse(root);
         plugin.initialize(step, "");
 
+        // set bean helper mock
+        plugin.setBeanHelper(beanHelper);
+
         assertEquals(PluginReturnValue.FINISH, plugin.run());
 
         // reload the metadata
@@ -221,8 +244,8 @@ public class MigrateVisualLibraryToGoobiPluginTest {
         // now we have pages
         assertEquals(454, physical.getAllChildren().size());
         // and additional metadata
-        assertEquals(14, logical.getAllMetadata().size());
-        assertEquals(15, volume.getAllMetadata().size());
+        assertEquals(15, logical.getAllMetadata().size());
+        assertEquals(16, volume.getAllMetadata().size());
         // and sub elements
         assertEquals(21, volume.getAllChildren().size());
 
@@ -241,6 +264,10 @@ public class MigrateVisualLibraryToGoobiPluginTest {
         plugin.setTestResponse(root);
         Step step = process.getSchritte().get(0);
         plugin.initialize(step, "");
+
+        // set bean helper mock
+        plugin.setBeanHelper(beanHelper);
+
         assertEquals(PluginReturnValue.FINISH, plugin.run());
 
         Fileformat mets = new MetsMods(prefs);

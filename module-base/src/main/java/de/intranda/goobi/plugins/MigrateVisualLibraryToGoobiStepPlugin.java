@@ -167,6 +167,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
 
     private Map<String, String> docStructRulesetNames = new HashMap<>();
     private DocStruct logical;
+    @Setter // for testing
     private BeanHelper beanHelper;
 
     /**
