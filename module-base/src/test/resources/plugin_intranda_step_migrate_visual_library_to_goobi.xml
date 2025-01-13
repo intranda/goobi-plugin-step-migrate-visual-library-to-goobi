@@ -11,11 +11,9 @@
         <!-- which projects to use for (can be more then one, otherwise use *) -->
         <project>*</project>
         <step>*</step>
-        
-        <!-- sample parameter -->
-        <value>test</value>
-        <!-- display button to finish the task directly from within the entered plugin -->
-        <allowTaskFinishButtons>true</allowTaskFinishButtons>
+
+        <downloadUrl>https://visuallibrary.net/ihd4/oai/?verb=GetRecord&amp;metadataPrefix=mets&amp;identifier=</downloadUrl>        
+
     </config>
 
 </config_plugin>

@@ -11,11 +11,9 @@
         <!-- which projects to use for (can be more then one, otherwise use *) -->
         <project>*</project>
         <step>*</step>
-        
-        <!-- sample parameter -->
-        <value>test</value>
-        <!-- display button to finish the task directly from within the entered plugin -->
-        <allowTaskFinishButtons>true</allowTaskFinishButtons>
+
+		<!-- define the property where the VL server url shall be taken from -->
+        <vl-url>VL URL</vl-url>        
     </config>
 
 </config_plugin>
