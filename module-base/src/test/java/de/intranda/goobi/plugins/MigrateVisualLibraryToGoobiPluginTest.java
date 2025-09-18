@@ -244,7 +244,7 @@ public class MigrateVisualLibraryToGoobiPluginTest {
         assertEquals(454, physical.getAllChildren().size());
         // and additional metadata
         assertEquals(15, logical.getAllMetadata().size());
-        assertEquals(16, volume.getAllMetadata().size());
+        assertEquals(15, volume.getAllMetadata().size());
         // and sub elements
         assertEquals(21, volume.getAllChildren().size());
 
@@ -277,7 +277,7 @@ public class MigrateVisualLibraryToGoobiPluginTest {
         DocStruct physical = dd.getPhysicalDocStruct();
 
         assertEquals(40, physical.getAllChildren().size());
-        assertEquals(17, logical.getAllMetadata().size());
+        assertEquals(16, logical.getAllMetadata().size());
         assertEquals(7, logical.getAllChildren().size());
 
     }
