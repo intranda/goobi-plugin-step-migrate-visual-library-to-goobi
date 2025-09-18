@@ -34,8 +34,9 @@ import java.util.Map;
 import org.apache.commons.configuration.SubnodeConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.goobi.beans.GoobiProperty;
+import org.goobi.beans.GoobiProperty.PropertyOwnerType;
 import org.goobi.beans.Process;
-import org.goobi.beans.Processproperty;
 import org.goobi.beans.Step;
 import org.goobi.production.enums.LogType;
 import org.goobi.production.enums.PluginGuiType;
@@ -75,6 +76,7 @@ import ugh.exceptions.DocStructHasNoTypeException;
 import ugh.exceptions.MetadataTypeNotAllowedException;
 import ugh.exceptions.PreferencesException;
 import ugh.exceptions.ReadException;
+import ugh.exceptions.TypeNotAllowedAsChildException;
 import ugh.exceptions.TypeNotAllowedForParentException;
 import ugh.exceptions.UGHException;
 import ugh.exceptions.WriteException;
@@ -108,10 +110,10 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
     @Setter
     private Element testResponse;
 
-    private static final Namespace xlink = Namespace.getNamespace("xlink", "http://www.w3.org/1999/xlink");
-    private static final Namespace mets = Namespace.getNamespace("mets", "http://www.loc.gov/METS/");
-    private static final Namespace mods = Namespace.getNamespace("mods", "http://www.loc.gov/mods/v3");
-    private static final Namespace oaiNamespace = Namespace.getNamespace("oai", "http://www.openarchives.org/OAI/2.0/");
+    protected static final Namespace xlink = Namespace.getNamespace("xlink", "http://www.w3.org/1999/xlink");
+    protected static final Namespace mets = Namespace.getNamespace("mets", "http://www.loc.gov/METS/");
+    protected static final Namespace mods = Namespace.getNamespace("mods", "http://www.loc.gov/mods/v3");
+    protected static final Namespace oaiNamespace = Namespace.getNamespace("oai", "http://www.openarchives.org/OAI/2.0/");
 
     private Map<String, Element> dmdSecMap = new HashMap<>();
     private Element imageFileGroup = null;
@@ -159,11 +161,10 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
     private MetadataType formatType;
     private MetadataType responsibilityType;
     private MetadataType titleMainSeriesType;
-    private MetadataType currentNoMainSeriesType;
     private MetadataType seriesOrderType;
     private MetadataType catalogIDMainSeriesType;
 
-    private String downloadUrl;
+    protected String downloadUrl;
 
     private Map<String, String> docStructRulesetNames = new HashMap<>();
     private DocStruct logical;
@@ -171,7 +172,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
     private BeanHelper beanHelper;
 
     /**
-     * Initialize the plugin with all needed defaults
+     * Initialize the plugin with all needed defaultsdownloadUrl
      */
     @Override
     public void initialize(Step step, String returnPath) {
@@ -203,7 +204,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
         dateDigitizationType = prefs.getMetadataTypeByName("_dateDigitization");
         electronicPublisherType = prefs.getMetadataTypeByName("_electronicPublisher");
         electronicEditionType = prefs.getMetadataTypeByName("_electronicEdition");
-        extentType = prefs.getMetadataTypeByName("SizeSourcePrint");
+        extentType = prefs.getMetadataTypeByName("physicalDescriptionExtent");
         subTitleType = prefs.getMetadataTypeByName("TitleDocSub1");
         partNumberType = prefs.getMetadataTypeByName("VolumeNumber");
         partNameType = prefs.getMetadataTypeByName("VolumeName");
@@ -216,14 +217,13 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
         otherPersonType = prefs.getMetadataTypeByName("OtherPerson");
 
         titleMainSeriesType = prefs.getMetadataTypeByName("TitleMainSeries");
-        currentNoMainSeriesType = prefs.getMetadataTypeByName("CurrentNoMainSeries");
         seriesOrderType = prefs.getMetadataTypeByName("SeriesOrder");
         catalogIDMainSeriesType = prefs.getMetadataTypeByName("CatalogIDMainSeries");
 
         // just in case it is not a JUnit test
         if (testResponse == null) {
             SubnodeConfiguration config = ConfigPlugins.getProjectAndStepConfig(title, step);
-            downloadUrl = getProcessProperty(step.getProzess(), config.getString("/vl-url"));
+            downloadUrl = getProcessProperty(step.getProzess(), config.getString("/downloadUrl"));
         }
 
         Path rulesetPath = Paths.get(ConfigurationHelper.getInstance().getRulesetFolder(), process.getRegelsatz().getDatei());
@@ -323,7 +323,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
 
             // save
             process.writeMetadataFile(fileformat);
-            beanHelper.EigenschaftHinzufuegen(process, "VL Final URL", downloadUrl + identifier);
+            beanHelper.EigenschaftHinzufuegen(process, "Final Download URL", getDownloadUrl(identifier));
             ProcessManager.saveProcess(process);
 
         } catch (ReadException | PreferencesException | WriteException | IOException | SwapException | DAOException e) {
@@ -393,6 +393,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
      * @param rec
      */
     private void importRecord(DigitalDocument digitalDocument, Element rec) {
+        imageFiles.clear();
         DocStruct docstruct = digitalDocument.getLogicalDocStruct();
         if (docstruct.getType().isAnchor()) {
             docstruct = docstruct.getAllChildren().get(0);
@@ -415,26 +416,31 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                     // get the images filegroup
                     if ("MAX".equals(fileGroup.getAttributeValue("USE"))) {
                         imageFileGroup = fileGroup;
-                        for (Element file : imageFileGroup.getChildren()) {
-                            Element flocat = file.getChild("FLocat", mets);
-
-                            String mimeType = file.getAttributeValue("MIMETYPE");
-                            String id = file.getAttributeValue("ID");
-                            String url = flocat.getAttributeValue("href", xlink);
-                            String filename;
-                            if (StringUtils.isNotBlank(mimeType)) {
-                                // get extension from mimetype
-                                filename = id + "." + mimeType.substring(mimeType.indexOf("/") + 1);
-                            } else {
-                                // use jpeg as default
-                                filename = id + ".jpg";
-                            }
-                            ImageName imageName = new ImageName(imageFiles.size() + 1, id, url, mimeType, filename);
-                            imageFiles.add(imageName);
-
-                        }
+                    } else if ("DEFAULT".equals(fileGroup.getAttributeValue("USE")) && imageFileGroup == null) {
+                        imageFileGroup = fileGroup;
                     }
                 }
+                if (imageFileGroup != null) {
+                    for (Element file : imageFileGroup.getChildren()) {
+                        Element flocat = file.getChild("FLocat", mets);
+
+                        String mimeType = file.getAttributeValue("MIMETYPE");
+                        String id = file.getAttributeValue("ID");
+                        String url = flocat.getAttributeValue("href", xlink);
+                        String filename;
+                        if (StringUtils.isNotBlank(mimeType)) {
+                            // get extension from mimetype
+                            filename = id + "." + mimeType.substring(mimeType.indexOf("/") + 1);
+                        } else {
+                            // use jpeg as default
+                            filename = id + ".jpg";
+                        }
+                        ImageName imageName = new ImageName(imageFiles.size() + 1, id, url, mimeType, filename);
+                        imageFiles.add(imageName);
+
+                    }
+                }
+
             } else if ("structMap".equals(metsElement.getName()) && "LOGICAL".equals(metsElement.getAttributeValue("TYPE"))) {
                 logicalStructMap = metsElement;
             } else if ("structMap".equals(metsElement.getName()) && "PHYSICAL".equals(metsElement.getAttributeValue("TYPE"))) {
@@ -444,7 +450,9 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
             }
         }
 
-        if (physicalStructMap == null) {
+        if (physicalStructMap == null)
+
+        {
             // anchor or invalid record, abort
             return;
         }
@@ -617,8 +625,11 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                         Element roleTermElement = role.getChildren().get(0);
                         roleTerm = roleTermElement.getText();
                     }
-                    try {
 
+                    if (roleTerm == null) {
+                        roleTerm = "aut";
+                    }
+                    try {
                         switch (roleTerm) {
 
                             // Author
@@ -657,7 +668,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                     List<Element> namePartList = name.getChildren("namePart", mods);
                     String firstName = null;
                     String lastName = null;
-                    if (namePartList != null) {
+                    if (namePartList != null && !namePartList.isEmpty()) {
                         for (Element namePart : namePartList) {
                             if ("family".equals(namePart.getAttributeValue("type"))) {
                                 lastName = namePart.getText();
@@ -666,6 +677,16 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                             } else if (StringUtils.isEmpty(lastName)) {
                                 lastName = namePart.getText();
                             }
+                        }
+                    } else {
+                        Element displayForm = name.getChild("displayForm", mods);
+                        String val = displayForm.getText();
+                        if (val.contains(",")) {
+                            String[] values = val.split(", ");
+                            firstName = values[1];
+                            lastName = values[0];
+                        } else {
+                            lastName = val;
                         }
                     }
 
@@ -794,13 +815,13 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
      * @param docstruct
      */
     private void addMetadata(Element element, MetadataType type, DocStruct docstruct) {
-        if (element != null) {
+        if (element != null && type != null) {
             try {
                 Metadata md = new Metadata(type);
                 md.setValue(element.getText());
                 docstruct.addMetadata(md);
             } catch (UGHException e) {
-                log.error("The metadata type '" + type.getName() + "'is not allowed inside of the docstruct '" + docstruct.getType().getName() + "'.",
+                log.debug("The metadata type '" + type.getName() + "'is not allowed inside of the docstruct '" + docstruct.getType().getName() + "'.",
                         e);
             }
         }
@@ -851,8 +872,18 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
         }
         try {
             parentDocstruct.addChild(docStruct);
-            docstructMap.put(id, docStruct);
+        } catch (TypeNotAllowedAsChildException e) {
+            // docstruct is not allowed as child, use default type
+            try {
+                docStruct = digDoc.createDocStruct(otherDocStructType);
+                parentDocstruct.addChild(docStruct);
+            } catch (UGHException e1) {
+                log.error(e1);
+            }
+        }
 
+        docstructMap.put(id, docStruct);
+        try {
             if (StringUtils.isNotBlank(dmdid)) {
                 // parse dmdSec
                 Element dmdSec = dmdSecMap.get(dmdid);
@@ -868,7 +899,6 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                 urn.setValue(contentids);
                 docStruct.addMetadata(urn);
             }
-
         } catch (UGHException e) {
             log.error(e);
         }
@@ -886,9 +916,9 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
      * @throws SwapException
      * @throws IOException
      */
-    private Element getRecord(String identifier) throws IOException, SwapException {
+    public Element getRecord(String identifier) throws IOException, SwapException {
 
-        Helper.addMessageToProcessJournal(process.getId(), LogType.DEBUG, "Try to analyze METS file from: " + downloadUrl + identifier,
+        Helper.addMessageToProcessJournal(process.getId(), LogType.DEBUG, "Try to analyze METS file from: " + getDownloadUrl(identifier),
                 "Visual Library Migration Plugin");
 
         if (StringUtils.isNotBlank(identifier)) {
@@ -902,7 +932,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                 // in case of real live usage
 
                 // get METS-File from VL and store it inside of the import folder
-                String xmlDocument = HttpUtils.getStringFromUrl(downloadUrl + identifier);
+                String xmlDocument = HttpUtils.getStringFromUrl(getDownloadUrl(identifier));
                 FileUtils.write(new File(process.getImportDirectory(), "/oai_mets_" + identifier + ".xml"), xmlDocument, "UTF-8");
 
                 // parse METS-File now
@@ -959,10 +989,10 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
      * @return
      */
     private String getProcessProperty(Process process, String propertyName) {
-        List<Processproperty> props = PropertyManager.getProcessPropertiesForProcess(process.getId());
-        for (Processproperty p : props) {
-            if (propertyName.equals(p.getTitel())) {
-                return p.getWert();
+        List<GoobiProperty> props = PropertyManager.getPropertiesForObject(process.getId(), PropertyOwnerType.PROCESS);
+        for (GoobiProperty p : props) {
+            if (propertyName.equals(p.getPropertyName())) {
+                return p.getPropertyValue();
             }
         }
         return null;
@@ -1046,7 +1076,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
             for (Element ele : altoFileGroup.getChildren()) {
                 Element flocat = ele.getChild("FLocat", mets);
                 String id = ele.getAttributeValue("ID");
-                String url = flocat.getAttributeValue("href", xlink);
+                String url = flocat.getAttributeValue("href", xlink).replace(" ", "");
                 String filename = id.replace("ALTO", "IMG_MAX_") + ".xml";
 
                 Path file = Paths.get(folder.toString(), filename);
@@ -1093,6 +1123,10 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
     @Override
     public String finish() {
         return null;
+    }
+
+    public String getDownloadUrl(String identifier) {
+        return downloadUrl + identifier;
     }
 
     @Getter
