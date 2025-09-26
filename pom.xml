@@ -10,6 +10,7 @@
   <groupId>io.goobi.workflow.plugin</groupId>
   <artifactId>plugin-step-migrate-visual-library-to-goobi</artifactId>
   <packaging>pom</packaging>
+  <version>24.12.3-SNAPSHOT</version>
   <modules>
     <module>module-base</module>
   </modules>
