@@ -34,9 +34,8 @@ import java.util.Map;
 import org.apache.commons.configuration.SubnodeConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.goobi.beans.GoobiProperty;
-import org.goobi.beans.GoobiProperty.PropertyOwnerType;
 import org.goobi.beans.Process;
+import org.goobi.beans.Processproperty;
 import org.goobi.beans.Step;
 import org.goobi.production.enums.LogType;
 import org.goobi.production.enums.PluginGuiType;
@@ -988,11 +987,12 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
      * @param step
      * @return
      */
+
     private String getProcessProperty(Process process, String propertyName) {
-        List<GoobiProperty> props = PropertyManager.getPropertiesForObject(process.getId(), PropertyOwnerType.PROCESS);
-        for (GoobiProperty p : props) {
-            if (propertyName.equals(p.getPropertyName())) {
-                return p.getPropertyValue();
+        List<Processproperty> props = PropertyManager.getProcessPropertiesForProcess(process.getId());
+        for (Processproperty p : props) {
+            if (propertyName.equals(p.getTitel())) {
+                return p.getWert();
             }
         }
         return null;
