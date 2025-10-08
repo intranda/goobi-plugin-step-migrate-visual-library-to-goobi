@@ -14,9 +14,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import de.sub.goobi.helper.BeanHelper;
-import de.sub.goobi.helper.Helper;
-import org.apache.commons.math3.analysis.function.Pow;
 import org.easymock.EasyMock;
 import org.goobi.beans.Process;
 import org.goobi.beans.Project;
@@ -39,6 +36,8 @@ import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
 import de.sub.goobi.config.ConfigurationHelper;
+import de.sub.goobi.helper.BeanHelper;
+import de.sub.goobi.helper.Helper;
 import de.sub.goobi.helper.VariableReplacer;
 import de.sub.goobi.helper.enums.StepStatus;
 import de.sub.goobi.metadaten.MetadatenHelper;
@@ -245,7 +244,7 @@ public class MigrateVisualLibraryToGoobiPluginTest {
         assertEquals(454, physical.getAllChildren().size());
         // and additional metadata
         assertEquals(15, logical.getAllMetadata().size());
-        assertEquals(16, volume.getAllMetadata().size());
+        assertEquals(15, volume.getAllMetadata().size());
         // and sub elements
         assertEquals(21, volume.getAllChildren().size());
 
@@ -278,7 +277,7 @@ public class MigrateVisualLibraryToGoobiPluginTest {
         DocStruct physical = dd.getPhysicalDocStruct();
 
         assertEquals(40, physical.getAllChildren().size());
-        assertEquals(17, logical.getAllMetadata().size());
+        assertEquals(16, logical.getAllMetadata().size());
         assertEquals(7, logical.getAllChildren().size());
 
     }

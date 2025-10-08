@@ -12,8 +12,8 @@
         <project>*</project>
         <step>*</step>
 
-		<!-- define the property where the VL server url shall be taken from -->
-        <vl-url>VL URL</vl-url>        
+		<!-- define the property where the server url shall be taken from -->
+        <downloadUrl>Repository URL</downloadUrl>        
     </config>
 
 </config_plugin>
