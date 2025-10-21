@@ -3,6 +3,10 @@ title: Datenmigration aus Visual Library
 identifier: intranda_step_migrate_visual_library_to_goobi
 description: Step Plugin für die Migration von Bestandsdaten aus Visual Library nach Goobi
 published: true
+keywords:
+    - Goobi workflow
+    - Plugin
+    - Step Plugin
 ---
 
 ## Einführung
