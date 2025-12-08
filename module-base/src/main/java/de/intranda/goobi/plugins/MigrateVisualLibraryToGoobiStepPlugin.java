@@ -6,6 +6,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.ArrayList;
 
 /**
@@ -51,6 +52,7 @@ import de.sub.goobi.config.ConfigPlugins;
 import de.sub.goobi.config.ConfigurationHelper;
 import de.sub.goobi.helper.BeanHelper;
 import de.sub.goobi.helper.Helper;
+import de.sub.goobi.helper.RetryUtils;
 import de.sub.goobi.helper.XmlTools;
 import de.sub.goobi.helper.exceptions.DAOException;
 import de.sub.goobi.helper.exceptions.SwapException;
@@ -1028,16 +1030,13 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
 
                     String filename = imageFile.getName();
                     Path file = Paths.get(folder.toString(), filename);
-                    try {
-                        OutputStream out = Files.newOutputStream(file);
-                        HttpUtils.getStreamFromUrl(out, url);
-                        out.close();
+
+                    try (OutputStream out = Files.newOutputStream(file)) {
+                        RetryUtils.retry(new IOException("failed after retries"), Duration.ofSeconds(5l), 4,
+                                () -> HttpUtils.getStreamFromUrl(out, url));
                     } catch (Exception e) {
-                        log.error("Error during image download from {}, retry in 5 sec", url);
-                        Thread.sleep(5000l);
-                        OutputStream out = Files.newOutputStream(Paths.get(folder.toString(), filename));
-                        HttpUtils.getStreamFromUrl(out, url);
-                        out.close();
+                        log.error("Error during image download from {}, after 5 retries", url);
+
                     }
                     // delete 0 byte files
                     if (Files.isRegularFile(file) && Files.size(file) == 0) {
@@ -1049,7 +1048,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
 
                 }
             }
-        } catch (IOException | InterruptedException | SwapException e) {
+        } catch (IOException | SwapException e) {
             log.error("Error while downloading the image files", e);
             return false;
         }
