@@ -165,6 +165,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
     private MetadataType titleMainSeriesType;
     private MetadataType seriesOrderType;
     private MetadataType catalogIDMainSeriesType;
+    private MetadataType purlType;
 
     protected String downloadUrl;
 
@@ -221,6 +222,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
         titleMainSeriesType = prefs.getMetadataTypeByName("TitleMainSeries");
         seriesOrderType = prefs.getMetadataTypeByName("SeriesOrder");
         catalogIDMainSeriesType = prefs.getMetadataTypeByName("CatalogIDMainSeries");
+        purlType = prefs.getMetadataTypeByName("_purl");
 
         // just in case it is not a JUnit test
         if (testResponse == null) {
@@ -761,6 +763,9 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                                 break;
                             case "hbz-idn":
                                 // ???
+                                break;
+                            case "purl":
+                                addMetadata(identifier, purlType, docstruct);
                                 break;
                             default:
                                 // ignore other identifier types
