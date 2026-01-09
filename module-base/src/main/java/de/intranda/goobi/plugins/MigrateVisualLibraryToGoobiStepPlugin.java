@@ -712,7 +712,9 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                 for (Element originInfo : originInfoList) {
                     if ("publication".equals(originInfo.getAttributeValue("eventType"))) {
                         Element place = originInfo.getChild("place", mods);
-                        addMetadata(place.getChild("placeTerm", mods), placeOfPublicationType, docstruct);
+                        if (place != null) {
+                            addMetadata(place.getChild("placeTerm", mods), placeOfPublicationType, docstruct);
+                        }
                         addMetadata(originInfo.getChild("publisher", mods), publisherNameType, docstruct);
                         addMetadata(originInfo.getChild("dateIssued", mods), publicationYearType, docstruct);
                     } else {
