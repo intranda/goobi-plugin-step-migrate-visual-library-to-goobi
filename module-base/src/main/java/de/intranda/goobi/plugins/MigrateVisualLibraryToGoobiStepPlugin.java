@@ -875,6 +875,10 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
 
             }
 
+            if (dst == null) {
+                dst = otherDocStructType;
+            }
+
             docStruct = digDoc.createDocStruct(dst);
         } catch (UGHException e) {
             log.error(e);
