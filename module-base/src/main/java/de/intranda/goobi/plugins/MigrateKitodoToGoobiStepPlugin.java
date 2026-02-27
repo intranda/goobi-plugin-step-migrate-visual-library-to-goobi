@@ -56,7 +56,7 @@ public class MigrateKitodoToGoobiStepPlugin extends MigrateVisualLibraryToGoobiS
     public Element getRecord(String identifier) throws IOException, SwapException {
 
         Helper.addMessageToProcessJournal(process.getId(), LogType.DEBUG, "Try to analyze METS file from: " + identifier,
-                "Visual Library Migration Plugin");
+                "Migration Plugin");
 
         if (StringUtils.isNotBlank(identifier)) {
             log.info("Get record for pid " + identifier);

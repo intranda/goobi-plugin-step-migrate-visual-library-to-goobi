@@ -273,7 +273,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
 
             if (identifier == null) {
                 //  write error message to processlog
-                Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "No ID found.", "Visual Library Migration Plugin");
+                Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "No ID found.", "Migration Plugin");
                 return false;
             }
             log.info("Get data for record " + identifier);
@@ -303,7 +303,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
             if (element == null) {
                 // no  record found
                 Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "No  record found for ID " + identifier,
-                        "Visual Library Migration Plugin");
+                        "Migration Plugin");
                 return false;
             }
 
@@ -333,7 +333,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
         } catch (ReadException | PreferencesException | WriteException | IOException | SwapException | DAOException e) {
             // write error message to processlog
             Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Error during  import " + e.getMessage(),
-                    "Visual Library Migration Plugin");
+                    "Migration Plugin");
             return false;
         }
 
@@ -427,7 +427,6 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                 if (imageFileGroup != null) {
                     for (Element file : imageFileGroup.getChildren()) {
                         Element flocat = file.getChild("FLocat", mets);
-
                         String mimeType = file.getAttributeValue("MIMETYPE");
                         String id = file.getAttributeValue("ID");
                         String url = flocat.getAttributeValue("href", xlink);
@@ -454,9 +453,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
             }
         }
 
-        if (physicalStructMap == null)
-
-        {
+        if (physicalStructMap == null) {
             // anchor or invalid record, abort
             return;
         }
@@ -932,7 +929,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
     public Element getRecord(String identifier) throws IOException, SwapException {
 
         Helper.addMessageToProcessJournal(process.getId(), LogType.DEBUG, "Try to analyze METS file from: " + getDownloadUrl(identifier),
-                "Visual Library Migration Plugin");
+                "Migration Plugin");
 
         if (StringUtils.isNotBlank(identifier)) {
             log.info("Get record for pid " + identifier);
@@ -1041,7 +1038,6 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
 
                     String filename = imageFile.getName();
                     Path file = Paths.get(folder.toString(), filename);
-
                     try (OutputStream out = Files.newOutputStream(file)) {
                         RetryUtils.retry(new IOException("failed after retries"), Duration.ofSeconds(5l), 4,
                                 () -> HttpUtils.getStreamFromUrl(out, url));
@@ -1051,10 +1047,39 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                     }
                     // delete 0 byte files
                     if (Files.isRegularFile(file) && Files.size(file) == 0) {
+
+                        //handle 403 permission denied in HAAB
+                        String id = imageFile.getId(); // -> FILE_0001_DEFAULT
+
+                        Element physSequence = physicalStructMap.getChild("div", mets);
+
+                        // check, if file was used in  structMap
+                        for (Element pageDiv : physSequence.getChildren("div", mets)) {
+                            for (Element fptr : pageDiv.getChildren("fptr", mets)) {
+                                String fileid = fptr.getAttributeValue("FILEID");
+                                if (id.equals(fileid)) {
+
+                                    // if it was used in the structMap, check if its linked to a logical element
+                                    String divId = pageDiv.getAttributeValue("ID"); // -> PHYS_0001
+                                    if (structLink != null) {
+                                        for (Element smLink : structLink.getChildren()) {
+                                            if (smLink.getAttributeValue("to", xlink).equals(divId)) {
+                                                // if this is the case, abort with an error. Otherwise skip this image, as it is not used
+                                                Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Image download failed.",
+                                                        "Migration Plugin");
+                                                Files.delete(file);
+                                                return false;
+                                            }
+                                        }
+
+                                    }
+                                    break;
+                                }
+                            }
+
+                        }
                         Files.delete(file);
-                        Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Image download failed.",
-                                "Visual Library Migration Plugin");
-                        return false;
+
                     }
 
                 }
@@ -1105,7 +1130,7 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                 if (Files.isRegularFile(file) && Files.size(file) == 0) {
                     Files.delete(file);
                     Helper.addMessageToProcessJournal(process.getId(), LogType.ERROR, "Fulltext download failed.",
-                            "Visual Library Migration Plugin");
+                            "Migration Plugin");
 
                 }
             }
