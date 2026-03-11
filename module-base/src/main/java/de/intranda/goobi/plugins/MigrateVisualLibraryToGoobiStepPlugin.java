@@ -751,23 +751,25 @@ public class MigrateVisualLibraryToGoobiStepPlugin implements IStepPluginVersion
                 List<Element> identifierList = modsElement.getChildren("identifier", mods);
                 if (identifierList != null) {
                     for (Element identifier : identifierList) {
-                        switch (identifier.getAttributeValue("type")) {
-                            case "gbv":
-                                // CatalogIDSource
-                                addMetadata(identifier, sourceType, docstruct);
-                                break;
-                            case "urn":
-                                // URN
-                                addMetadata(identifier, modsUrnType, docstruct);
-                                break;
-                            case "hbz-idn":
-                                // ???
-                                break;
-                            case "purl":
-                                addMetadata(identifier, purlType, docstruct);
-                                break;
-                            default:
-                                // ignore other identifier types
+                        if (StringUtils.isNotBlank(identifier.getAttributeValue("type"))) {
+                            switch (identifier.getAttributeValue("type")) {
+                                case "gbv":
+                                    // CatalogIDSource
+                                    addMetadata(identifier, sourceType, docstruct);
+                                    break;
+                                case "urn":
+                                    // URN
+                                    addMetadata(identifier, modsUrnType, docstruct);
+                                    break;
+                                case "hbz-idn":
+                                    // ???
+                                    break;
+                                case "purl":
+                                    addMetadata(identifier, purlType, docstruct);
+                                    break;
+                                default:
+                                    // ignore other identifier types
+                            }
                         }
                     }
                 }
